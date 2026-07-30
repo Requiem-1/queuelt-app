@@ -1,0 +1,16 @@
+const express = require('express');
+const router = express.Router();
+const {
+  joinQueue,
+  getMyTicket,
+  getLiveQueueStatus,
+  updateTicketStatus,
+} = require('../controllers/ticketController');
+const { protect, optionalAuth, authorize } = require('../middleware/auth');
+
+router.post('/join', optionalAuth, joinQueue);
+router.get('/my-ticket', optionalAuth, getMyTicket);
+router.get('/live/:counterId', getLiveQueueStatus);
+router.patch('/:ticketId/status', protect, authorize('admin', 'superadmin'), updateTicketStatus);
+
+module.exports = router;

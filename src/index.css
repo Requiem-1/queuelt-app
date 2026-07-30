@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+@variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+body {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  -webkit-font-smoothing: antialiased;
+  background-color: #fafafa;
+  color: #18181b;
+  transition-property: color, background-color;
+  transition-duration: 200ms;
+}
+
+.dark body {
+  background-color: #09090b;
+  color: #f4f4f5;
+}
+
+.tabular-nums, [data-tabular] {
+  font-variant-numeric: tabular-nums;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Custom selection */
+::selection {
+  background-color: #27272a;
+  color: #ffffff;
+}
+
+.dark ::selection {
+  background-color: #3f3f46;
+  color: #ffffff;
+}
