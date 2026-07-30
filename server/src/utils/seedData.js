@@ -1,5 +1,8 @@
-require('node:dns/promises').setServers(['1.1.1.1', '8.8.8.8']);
-require('dotenv').config();
+try {
+  require('node:dns/promises').setServers(['1.1.1.1', '8.8.8.8']);
+} catch (e) {}
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
