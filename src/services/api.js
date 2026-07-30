@@ -1,7 +1,18 @@
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
+let rawBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
+rawBaseUrl = rawBaseUrl.trim().replace(/\/+$/, '');
+
+if (!rawBaseUrl.includes('/api/v1')) {
+  if (rawBaseUrl.endsWith('/api')) {
+    rawBaseUrl = `${rawBaseUrl}/v1`;
+  } else {
+    rawBaseUrl = `${rawBaseUrl}/api/v1`;
+  }
+}
+
+const API_BASE_URL = rawBaseUrl;
 
 const api = axios.create({
   baseURL: API_BASE_URL,
