@@ -85,8 +85,8 @@ export const JoinQueueModal = ({ isOpen, onClose, venueData, counterData }) => {
       const res = await api.post('/tickets/join', payload);
       const ticket = res.ticket;
 
-      if (ticket) {
-        localStorage.setItem('queueit_active_ticket', JSON.stringify(ticket));
+      if (ticket && typeof window !== 'undefined' && window.sessionStorage) {
+        sessionStorage.setItem('queueit_active_ticket', JSON.stringify(ticket));
       }
 
       toast.success(`Successfully joined queue! Ticket ${ticket?.ticketNumber || ''}`);

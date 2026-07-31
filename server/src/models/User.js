@@ -32,6 +32,10 @@ const userSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
+    pushSubscription: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
   },
   {
     timestamps: true,

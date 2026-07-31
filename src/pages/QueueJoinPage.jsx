@@ -158,7 +158,7 @@ export const QueueJoinPage = () => {
 
                 <div className="text-right">
                   <p className="text-[10px] font-bold text-zinc-400 uppercase mb-0.5">Now Serving</p>
-                  <span className="font-mono font-bold tracking-tight px-3 py-1 bg-zinc-800 text-zinc-100 border border-zinc-700/60 rounded-lg text-sm shadow-inner inline-block tabular-nums">
+                  <span className="font-mono font-bold tracking-tight px-3 py-1 bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-700/60 rounded-lg text-sm shadow-inner inline-block tabular-nums">
                     {counter.nowServing}
                   </span>
                 </div>
@@ -167,12 +167,12 @@ export const QueueJoinPage = () => {
               {/* Stats */}
               <div className="grid grid-cols-2 gap-2 py-3 border-y border-zinc-100 dark:border-zinc-800/80 text-xs">
                 <div>
-                  <p className="text-zinc-400 font-normal">People Ahead</p>
-                  <p className="font-bold text-zinc-100 tabular-nums">{counter.inLine} guests</p>
+                  <p className="text-zinc-500 dark:text-zinc-400 font-normal">People Ahead</p>
+                  <p className="font-bold text-zinc-900 dark:text-zinc-100 tabular-nums">{counter.inLine} guests</p>
                 </div>
                 <div>
-                  <p className="text-zinc-400 font-normal">Est. Wait Time</p>
-                  <p className="font-bold text-zinc-100 tabular-nums">~{counter.inLine * 3} Mins ({counter.waitPerPerson}/person)</p>
+                  <p className="text-zinc-500 dark:text-zinc-400 font-normal">Est. Wait Time</p>
+                  <p className="font-bold text-zinc-900 dark:text-zinc-100 tabular-nums">~{counter.inLine * 3} Mins ({counter.waitPerPerson}/person)</p>
                 </div>
               </div>
 
@@ -180,7 +180,7 @@ export const QueueJoinPage = () => {
               <button
                 type="button"
                 onClick={() => setSelectedCounter(counter)}
-                className="bg-white text-black hover:bg-zinc-200 font-semibold shadow-xs transition-all rounded-xl px-4 py-2.5 w-full flex items-center justify-center gap-2 cursor-pointer text-sm"
+                className="bg-zinc-900 dark:bg-white text-white dark:text-black hover:bg-zinc-800 dark:hover:bg-zinc-200 font-semibold shadow-xs transition-all rounded-xl px-4 py-2.5 w-full flex items-center justify-center gap-2 cursor-pointer text-sm"
               >
                 <span>Join Queue</span>
                 <ChevronRight className="w-4 h-4" />

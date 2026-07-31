@@ -26,6 +26,7 @@ import {
 import { mockVenues } from '../data/mockVenues';
 import {
   requestNotificationPermission,
+  subscribeToWebPush,
   notifyTop3Spot,
   notifyCallOut,
   notifySkipped,
@@ -539,16 +540,22 @@ export const LiveQueueStatus = () => {
               <span>I'm Late</span>
             </button>
 
-            {/* Push / SMS Notification Toggle */}
+            {/* Push / Web Notification Toggle */}
             <button
               type="button"
               onClick={async () => {
                 const nextState = !smsAlertEnabled;
                 setSmsAlertEnabled(nextState);
                 if (nextState) {
-                  const perm = await requestNotificationPermission();
-                  if (perm === 'granted') {
-                    notifyTop3Spot(counterName, position, tokenId);
+                  const activeTicketId = ticketData?._id || passedTicket?._id || id;
+                  const success = await subscribeToWebPush(activeTicketId);
+                  if (success) {
+                    toast.success('Web Push Notifications enabled!');
+                  } else {
+                    const perm = await requestNotificationPermission();
+                    if (perm === 'granted') {
+                      notifyTop3Spot(counterName, position, tokenId);
+                    }
                   }
                 }
               }}

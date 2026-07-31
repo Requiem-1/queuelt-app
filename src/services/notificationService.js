@@ -1,8 +1,22 @@
+import api from './api';
+
 /**
  * Push Notification Client Handler for QueueIt
  */
 
 const NOTIFICATION_STORAGE_KEY = 'queueit_notifications_enabled';
+
+// Convert base64 VAPID public key string to Uint8Array for PushManager
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
 
 /**
  * Trigger native browser Notification.requestPermission()
@@ -22,6 +36,61 @@ export const requestNotificationPermission = async () => {
   } catch (error) {
     console.error('Failed to request notification permission:', error);
     return 'denied';
+  }
+};
+
+/**
+ * Register web push subscription with the backend server
+ */
+export const subscribeToWebPush = async (ticketId = null, userId = null) => {
+  if (
+    typeof window === 'undefined' ||
+    !('serviceWorker' in navigator) ||
+    !('PushManager' in window)
+  ) {
+    console.warn('Push messaging is not supported in this browser.');
+    return false;
+  }
+
+  const permission = await requestNotificationPermission();
+  if (permission !== 'granted') {
+    return false;
+  }
+
+  try {
+    let publicKey =
+      'BEi5y3uTMm0nSi0fsVaMiqIig8VrU-V-_PzDuVfnumT-dIdDgfa6y3bel2W0S2-1TdSqxZULzcNKMFdvKAG4zRM';
+    try {
+      const res = await api.get('/notifications/vapid-public-key');
+      if (res && res.publicKey) {
+        publicKey = res.publicKey;
+      }
+    } catch (err) {
+      console.warn('Using fallback VAPID key:', err.message);
+    }
+
+    const registration = await navigator.serviceWorker.ready;
+    let subscription = await registration.pushManager.getSubscription();
+
+    if (!subscription) {
+      const convertedKey = urlBase64ToUint8Array(publicKey);
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: convertedKey,
+      });
+    }
+
+    // Send subscription payload to backend
+    await api.post('/notifications/subscribe', {
+      subscription: subscription.toJSON ? subscription.toJSON() : subscription,
+      ticketId,
+      userId,
+    });
+
+    return true;
+  } catch (error) {
+    console.error('Error subscribing to web push notifications:', error);
+    return false;
   }
 };
 
@@ -113,6 +182,7 @@ export const notifySkipped = (counterName = 'the counter', tokenNumber = '') => 
 
 export default {
   requestNotificationPermission,
+  subscribeToWebPush,
   isNotificationEnabled,
   sendLocalNotification,
   notifyTop3Spot,

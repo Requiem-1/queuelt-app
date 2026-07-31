@@ -1,9 +1,10 @@
 import { lazy, Suspense } from 'react';
-import { Routes, Route, useLocation } from 'react-router-dom';
+import { Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import MainLayout from '../components/layout/MainLayout';
 import { ProtectedRoute, AdminRoute, SuperAdminRoute } from '../components/auth/ProtectedRoute';
 import PageTransition from '../components/PageTransition';
+import { useAuth } from '../context/AuthContext';
 
 const HomePage = lazy(() => import('../pages/HomePage'));
 const QueueJoinPage = lazy(() => import('../pages/QueueJoinPage'));
@@ -22,6 +23,19 @@ const PageLoader = () => (
   </div>
 );
 
+const RootRoute = () => {
+  const { user, isLoading } = useAuth();
+  if (isLoading) return <PageLoader />;
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+  return (
+    <PageTransition>
+      <HomePage />
+    </PageTransition>
+  );
+};
+
 export const AppRouter = () => {
   const location = useLocation();
 
@@ -30,8 +44,19 @@ export const AppRouter = () => {
       <Suspense fallback={<PageLoader />}>
         <Routes location={location} key={location.pathname}>
           <Route path="/" element={<MainLayout />}>
-            {/* Public Routes */}
-            <Route index element={<PageTransition><HomePage /></PageTransition>} />
+            {/* Public / Protected Routes */}
+            <Route index element={<RootRoute />} />
+            <Route path="venues" element={<RootRoute />} />
+            <Route path="venues/:id" element={<PageTransition><QueueJoinPage /></PageTransition>} />
+            <Route path="venues/:id/join" element={<PageTransition><QueueJoinPage /></PageTransition>} />
+            <Route
+              path="venues/:id/status"
+              element={
+                <ProtectedRoute>
+                  <PageTransition><LiveQueueStatus /></PageTransition>
+                </ProtectedRoute>
+              }
+            />
             <Route path="queue/:id/join" element={<PageTransition><QueueJoinPage /></PageTransition>} />
             <Route
               path="queue/:id/status"

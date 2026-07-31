@@ -16,7 +16,10 @@ export const Navbar = () => {
 
   const handleLogout = () => {
     logout();
-    if (typeof window !== 'undefined' && window.localStorage) {
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('queueit_token');
+      sessionStorage.removeItem('queueit_user');
+      sessionStorage.removeItem('queueit_active_ticket');
       localStorage.removeItem('queueit_token');
       localStorage.removeItem('queueit_user');
       localStorage.removeItem('queueit_active_ticket');
@@ -39,7 +42,7 @@ export const Navbar = () => {
 
   const navLinks = [
     { name: 'Browse Venues', href: '/', matchPaths: ['/', '/venues'], icon: Compass },
-    { name: 'My Queue', href: '/queue/c1/status', matchPaths: ['/queue/c1/status', '/my-queue'], icon: Ticket },
+    { name: 'My Queue', href: '/my-queue', matchPaths: ['/queue/c1/status', '/queue/v1/status', '/my-queue', '/queue/status'], icon: Ticket },
     { name: 'Admin Dashboard', href: '/admin', matchPaths: ['/admin', '/admin/queues', '/admin/analytics', '/admin/settings'], icon: LayoutDashboard },
   ];
 
@@ -142,7 +145,7 @@ export const Navbar = () => {
                   {/* Navigation Shortcuts */}
                   <div className="space-y-1 text-xs font-semibold text-zinc-700 dark:text-zinc-300">
                     <Link
-                      to="/queue/v1/status"
+                      to="/my-queue"
                       onClick={() => setDropdownOpen(false)}
                       className="flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
                     >

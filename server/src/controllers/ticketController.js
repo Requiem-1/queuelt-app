@@ -1,6 +1,7 @@
 const Ticket = require('../models/Ticket');
 const Counter = require('../models/Counter');
 const Venue = require('../models/Venue');
+const { sendPushNotification } = require('../utils/push');
 
 /**
  * @desc    Join queue / Create new ticket
@@ -257,6 +258,62 @@ const updateTicketStatus = async (req, res) => {
     const io = req.app.get('io');
     if (io) {
       io.emit('ticket:updated', updatedTicket);
+    }
+
+    // Trigger Web Push Notifications for status changes and top 3 alerts
+    try {
+      const populatedTicketWithUser = await Ticket.findById(ticket._id).populate('user');
+      const sub =
+        populatedTicketWithUser?.pushSubscription ||
+        (populatedTicketWithUser?.user && populatedTicketWithUser.user.pushSubscription);
+
+      if (sub) {
+        if (status === 'serving') {
+          sendPushNotification(sub, {
+            title: '🔔 Your turn! Please approach the counter',
+            body: `Ticket ${ticket.ticketNumber} is now being served!`,
+            url: `/queue/${ticket._id}/status`,
+            tag: `callout-${ticket.ticketNumber}`,
+          });
+        } else if (status === 'next') {
+          sendPushNotification(sub, {
+            title: "⚡ You're next in line!",
+            body: `Ticket ${ticket.ticketNumber} is next. Please head near the counter.`,
+            url: `/queue/${ticket._id}/status`,
+            tag: `next-${ticket.ticketNumber}`,
+          });
+        } else if (status === 'skipped') {
+          sendPushNotification(sub, {
+            title: '⚠️ You were skipped',
+            body: `Ticket ${ticket.ticketNumber} missed its turn. Tap to check queue.`,
+            url: `/queue/${ticket._id}/status`,
+            tag: `skipped-${ticket.ticketNumber}`,
+          });
+        }
+      }
+
+      // Check remaining waiting tickets for top 3 alerts
+      const topWaitingTickets = await Ticket.find({
+        counter: ticket.counter,
+        status: { $in: ['waiting', 'next'] },
+      })
+        .sort({ createdAt: 1 })
+        .limit(3)
+        .populate('user');
+
+      topWaitingTickets.forEach((t, idx) => {
+        const tSub = t.pushSubscription || (t.user && t.user.pushSubscription);
+        if (tSub) {
+          sendPushNotification(tSub, {
+            title: `⚡ You're top ${idx + 1} in line!`,
+            body: `Ticket ${t.ticketNumber} is position #${idx + 1} at the counter.`,
+            url: `/queue/${t._id}/status`,
+            tag: `top3-${t.ticketNumber}`,
+          });
+        }
+      });
+    } catch (pushErr) {
+      console.warn('[ticketController]: Error triggering web push notifications:', pushErr.message);
     }
 
     res.json({

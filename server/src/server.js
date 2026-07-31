@@ -1,4 +1,8 @@
-require('node:dns/promises').setServers(['1.1.1.1', '8.8.8.8']);
+try {
+  require('node:dns/promises').setServers(['1.1.1.1', '8.8.8.8']);
+} catch {
+  // DNS fallback
+}
 require('dotenv').config();
 const http = require('http');
 const { Server } = require('socket.io');

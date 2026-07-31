@@ -5,6 +5,7 @@ const authRoutes = require('./routes/authRoutes');
 const venueRoutes = require('./routes/venueRoutes');
 const ticketRoutes = require('./routes/ticketRoutes');
 const analyticsRoutes = require('./routes/analyticsRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 
 const app = express();
 
@@ -37,6 +38,7 @@ app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/venues', venueRoutes);
 app.use('/api/v1/tickets', ticketRoutes);
 app.use('/api/v1/analytics', analyticsRoutes);
+app.use('/api/v1/notifications', notificationRoutes);
 
 app.get('/api/v1/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

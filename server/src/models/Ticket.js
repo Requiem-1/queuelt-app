@@ -50,6 +50,10 @@ const ticketSchema = new mongoose.Schema(
     estimatedWaitMinutes: {
       type: Number,
     },
+    pushSubscription: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
   },
   {
     timestamps: true,

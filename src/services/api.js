@@ -24,7 +24,13 @@ const api = axios.create({
 // Request Interceptor: Attach Bearer Token if available
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('queueit_token') || localStorage.getItem('token');
+    const token =
+      (typeof window !== 'undefined' && window.sessionStorage
+        ? sessionStorage.getItem('queueit_token') || sessionStorage.getItem('token')
+        : null) ||
+      (typeof window !== 'undefined' && window.localStorage
+        ? localStorage.getItem('queueit_token') || localStorage.getItem('token')
+        : null);
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -43,8 +49,9 @@ api.interceptors.response.use(
     const message =
       error.response?.data?.message || error.message || 'An unexpected API error occurred';
 
-    if (!error.response || status >= 500) {
-      toast.error('Network error or server unavailable');
+    // Only toast on 5xx server errors, suppress toast on 401/404 so caller can handle gracefully
+    if (status >= 500) {
+      toast.error('Server unavailable or database connection error');
     }
 
     return Promise.reject(new Error(message));

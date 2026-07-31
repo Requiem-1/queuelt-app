@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Venue = require('../models/Venue');
 const Counter = require('../models/Counter');
 const Ticket = require('../models/Ticket');
@@ -53,11 +54,17 @@ const getVenueBySlug = async (req, res) => {
   try {
     const { slug } = req.params;
 
-    const venue = await Venue.findOne({ slug: slug.toLowerCase() });
+    let venue;
+    if (mongoose.Types.ObjectId.isValid(slug)) {
+      venue = await Venue.findOne({ $or: [{ slug: slug.toLowerCase() }, { _id: slug }] });
+    } else {
+      venue = await Venue.findOne({ slug: slug.toLowerCase() });
+    }
+
     if (!venue) {
       return res.status(404).json({
         success: false,
-        message: `Venue with slug '${slug}' not found`,
+        message: `Venue with slug or ID '${slug}' not found`,
       });
     }
 
