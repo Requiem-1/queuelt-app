@@ -331,9 +331,51 @@ const updateTicketStatus = async (req, res) => {
   }
 };
 
+/**
+ * @desc    Leave queue / Cancel active ticket
+ * @route   DELETE /api/v1/tickets/:ticketId/leave
+ * @access  Public / Guest / User
+ */
+const leaveQueue = async (req, res) => {
+  try {
+    const { ticketId } = req.params;
+
+    const ticket = await Ticket.findById(ticketId);
+    if (!ticket) {
+      return res.status(404).json({ success: false, message: 'Ticket not found' });
+    }
+
+    ticket.status = 'left';
+    await ticket.save();
+
+    const updatedTicket = await Ticket.findById(ticket._id)
+      .populate('venue', 'name slug')
+      .populate('counter', 'name code currentServingToken');
+
+    const io = req.app.get('io');
+    if (io) {
+      io.emit('ticket:updated', updatedTicket);
+    }
+
+    res.json({
+      success: true,
+      message: 'Successfully left the queue',
+      ticket: updatedTicket,
+    });
+  } catch (error) {
+    console.error('[ticketController]: leaveQueue error:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Server error leaving queue',
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   joinQueue,
   getMyTicket,
   getLiveQueueStatus,
   updateTicketStatus,
+  leaveQueue,
 };

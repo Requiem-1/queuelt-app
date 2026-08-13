@@ -285,6 +285,7 @@ export const AuthProvider = ({ children }) => {
         loginWithGoogle,
         logout,
         setUserRole,
+        setGuestFallback,
       }}
     >
       {children}

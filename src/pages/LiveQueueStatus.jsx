@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
 import { toast } from 'react-hot-toast';
@@ -33,6 +33,7 @@ import {
 } from '../services/notificationService';
 
 import socket from '../services/socket';
+import api from '../services/api';
 
 // Mock QR Code Component
 const QRCodeDisplay = ({ tokenId, hash }) => (
@@ -145,38 +146,103 @@ export const LiveQueueStatus = () => {
     };
   }, [showQrModal, showLateModal, showLeaveModal]);
 
+  const [ticketData, setTicketData] = useState(passedTicket || null);
+  const activeTicketId = ticketData?._id || passedTicket?._id || (id && id.length >= 12 ? id : null);
+
+  const fetchLiveTicket = useCallback(async () => {
+    try {
+      const queryParam = activeTicketId ? `?ticketId=${activeTicketId}` : '';
+      const res = await api.get(`/tickets/my-ticket${queryParam}`);
+      if (res && res.ticket) {
+        setTicketData(res.ticket);
+        if (typeof res.ticket.positionInQueue === 'number') {
+          setPosition(res.ticket.positionInQueue);
+        }
+        if (res.ticket.status === 'serving') {
+          setIsNowServing(true);
+          setPosition(0);
+        } else if (res.ticket.status === 'skipped') {
+          setIsSkipped(true);
+        } else if (res.ticket.status === 'served' || res.ticket.status === 'left') {
+          setIsCancelled(true);
+        }
+        setLastSyncedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      }
+    } catch (err) {
+      console.warn('[LiveQueueStatus]: API ticket fetch fallback to local state:', err.message);
+    }
+  }, [activeTicketId]);
+
+  useEffect(() => {
+    let isSubscribed = true;
+    const syncTicket = async () => {
+      try {
+        const queryParam = activeTicketId ? `?ticketId=${activeTicketId}` : '';
+        const res = await api.get(`/tickets/my-ticket${queryParam}`);
+        if (res && res.ticket && isSubscribed) {
+          setTicketData(res.ticket);
+          if (typeof res.ticket.positionInQueue === 'number') {
+            setPosition(res.ticket.positionInQueue);
+          }
+          if (res.ticket.status === 'serving') {
+            setIsNowServing(true);
+            setPosition(0);
+          } else if (res.ticket.status === 'skipped') {
+            setIsSkipped(true);
+          } else if (res.ticket.status === 'served' || res.ticket.status === 'left') {
+            setIsCancelled(true);
+          }
+          setLastSyncedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+        }
+      } catch (err) {
+        console.warn('[LiveQueueStatus]: API ticket fetch fallback to local state:', err.message);
+      }
+    };
+
+    syncTicket();
+    return () => {
+      isSubscribed = false;
+    };
+  }, [activeTicketId]);
+
   // Real-Time Socket.io Connection Effect
   useEffect(() => {
     const handleTicketUpdated = (updatedTicket) => {
       console.log('[LiveQueueStatus]: Socket ticket:updated received:', updatedTicket);
       setLastSyncedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
 
+      const currentTicketId = ticketData?._id || passedTicket?._id;
       if (
-        (passedTicket && updatedTicket._id === passedTicket._id) ||
+        (currentTicketId && updatedTicket._id === currentTicketId) ||
         updatedTicket.ticketNumber === tokenId
       ) {
         if (updatedTicket.status === 'serving') {
           setIsNowServing(true);
           setPosition(0);
-          notifyCallOut(tokenId, counterName);
+          notifyCallOut(counterName, tokenId);
         } else if (updatedTicket.status === 'skipped') {
           setIsSkipped(true);
-          notifySkipped();
+          notifySkipped(counterName, tokenId);
         } else if (updatedTicket.status === 'served' || updatedTicket.status === 'left') {
           setIsCancelled(true);
         }
       } else {
-        // Someone ahead was served, advance position
-        setPosition((prev) => Math.max(0, prev - 1));
+        fetchLiveTicket();
       }
     };
 
+    const handleTicketCreated = () => {
+      fetchLiveTicket();
+    };
+
     socket.on('ticket:updated', handleTicketUpdated);
+    socket.on('ticket:created', handleTicketCreated);
 
     return () => {
       socket.off('ticket:updated', handleTicketUpdated);
+      socket.off('ticket:created', handleTicketCreated);
     };
-  }, [passedTicket, tokenId, counterName]);
+  }, [passedTicket, tokenId, counterName, ticketData, fetchLiveTicket]);
 
   // Calculated stats
   const waitPerPersonMins = 3;
@@ -308,8 +374,17 @@ export const LiveQueueStatus = () => {
     toast.success('Moved to end of queue');
   };
 
-  const handleConfirmLeave = () => {
+  const handleConfirmLeave = async () => {
     setShowLeaveModal(false);
+    try {
+      const activeId = ticketData?._id || passedTicket?._id || id;
+      if (activeId && activeId.length >= 12) {
+        await api.delete(`/tickets/${activeId}/leave`);
+      }
+    } catch (err) {
+      console.warn('[LiveQueueStatus]: API leave queue fallback:', err.message);
+    }
+    setIsCancelled(true);
     toast.success('You have left the queue');
     navigate('/', { replace: true });
   };

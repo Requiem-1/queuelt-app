@@ -26,6 +26,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import socket from '../services/socket';
+import api from '../services/api';
 
 const INITIAL_VENUES = [
   { id: 'v1', name: 'Main Cafeteria', code: 'CAF' },
@@ -252,23 +253,39 @@ export const AdminDashboard = () => {
   };
 
   // 1. PRIMARY ACTION: Call Next Customer
-  const handleCallNext = (counterId) => {
+  const handleCallNext = async (counterId) => {
+    const venueKey = selectedVenue.id;
+    const currentCounters = countersData[venueKey] || [];
+    const targetCounter = currentCounters.find((c) => c.id === counterId);
+    if (!targetCounter || targetCounter.queue.length === 0) {
+      showToast(`No waiting guests in ${targetCounter?.name || 'counter'}`);
+      return;
+    }
+
+    const [nextGuest, ...remainingQueue] = targetCounter.queue;
+
+    // Send backend API call if nextGuest has MongoDB ID
+    if (nextGuest.id && nextGuest.id.length >= 12) {
+      try {
+        await api.patch(`/tickets/${nextGuest.id}/status`, { status: 'serving' });
+      } catch (err) {
+        console.warn('[AdminDashboard]: API callNext failed:', err.message);
+      }
+    }
+
+    const updatedRemaining = remainingQueue.map((item, idx) =>
+      idx === 0 ? { ...item, status: 'Next In Line' } : item
+    );
+    showToast(`Ticket ${nextGuest.ticket} updated to Serving`);
+
     setCountersData((prev) => ({
       ...prev,
-      [selectedVenue.id]: prev[selectedVenue.id].map((c) => {
+      [venueKey]: (prev[venueKey] || []).map((c) => {
         if (c.id !== counterId) return c;
-        if (c.queue.length === 0) {
-          showToast(`No waiting guests in ${c.name}`);
-          return c;
-        }
-        const [nextGuest, ...remainingQueue] = c.queue;
-        const updatedRemaining = remainingQueue.map((item, idx) =>
-          idx === 0 ? { ...item, status: 'Next In Line' } : item
-        );
-        showToast(`Ticket ${nextGuest.ticket} updated to Serving`);
         return {
           ...c,
           nowServing: {
+            id: nextGuest.id,
             token: nextGuest.ticket,
             name: nextGuest.name,
             party: nextGuest.party,
@@ -281,35 +298,58 @@ export const AdminDashboard = () => {
   };
 
   // 2. PRIMARY ACTION: Skip Token (moves current nowServing to skipped list & prompts next token)
-  const handleSkipToken = (counterId) => {
-    setCountersData((prev) => ({
-      ...prev,
-      [selectedVenue.id]: prev[selectedVenue.id].map((c) => {
-        if (c.id !== counterId) return c;
-        if (!c.nowServing) {
-          showToast(`No active token to skip in ${c.name}`);
-          return c;
+  const handleSkipToken = async (counterId) => {
+    const venueKey = selectedVenue.id;
+    const currentCounters = countersData[venueKey] || [];
+    const targetCounter = currentCounters.find((c) => c.id === counterId);
+
+    if (!targetCounter || !targetCounter.nowServing) {
+      showToast(`No active token to skip in ${targetCounter?.name || 'counter'}`);
+      return;
+    }
+
+    const currentServing = targetCounter.nowServing;
+
+    // Send backend API call if currentServing has MongoDB ID
+    if (currentServing.id && currentServing.id.length >= 12) {
+      try {
+        await api.patch(`/tickets/${currentServing.id}/status`, { status: 'skipped' });
+      } catch (err) {
+        console.warn('[AdminDashboard]: API skip failed:', err.message);
+      }
+    }
+
+    const skippedGuest = {
+      ...currentServing,
+      skippedAt: 'Just now',
+    };
+
+    const updatedSkippedList = [...(targetCounter.skippedList || []), skippedGuest];
+    setNoShowsCount((cnt) => cnt + 1);
+
+    if (targetCounter.queue.length > 0) {
+      const [nextGuest, ...remainingQueue] = targetCounter.queue;
+      if (nextGuest.id && nextGuest.id.length >= 12) {
+        try {
+          await api.patch(`/tickets/${nextGuest.id}/status`, { status: 'serving' });
+        } catch (err) {
+          console.warn('[AdminDashboard]: API callNext after skip failed:', err.message);
         }
-
-        const skippedGuest = {
-          ...c.nowServing,
-          skippedAt: 'Just now',
-        };
-
-        const updatedSkippedList = [...(c.skippedList || []), skippedGuest];
-        setNoShowsCount((cnt) => cnt + 1);
-
-        if (c.queue.length > 0) {
-          const [nextGuest, ...remainingQueue] = c.queue;
-          const updatedRemaining = remainingQueue.map((item, idx) =>
-            idx === 0 ? { ...item, status: 'Next In Line' } : item
-          );
-          showToast(
-            `Skipped token ${c.nowServing.token}. Automatically calling next: ${nextGuest.name} (${nextGuest.ticket})`
-          );
+      }
+      const updatedRemaining = remainingQueue.map((item, idx) =>
+        idx === 0 ? { ...item, status: 'Next In Line' } : item
+      );
+      showToast(
+        `Skipped token ${currentServing.token}. Automatically calling next: ${nextGuest.name} (${nextGuest.ticket})`
+      );
+      setCountersData((prev) => ({
+        ...prev,
+        [venueKey]: (prev[venueKey] || []).map((c) => {
+          if (c.id !== counterId) return c;
           return {
             ...c,
             nowServing: {
+              id: nextGuest.id,
               token: nextGuest.ticket,
               name: nextGuest.name,
               party: nextGuest.party,
@@ -318,36 +358,66 @@ export const AdminDashboard = () => {
             skippedList: updatedSkippedList,
             queue: updatedRemaining,
           };
-        } else {
-          showToast(`Skipped token ${c.nowServing.token}. No remaining queue.`);
+        }),
+      }));
+    } else {
+      showToast(`Skipped token ${currentServing.token}. No remaining queue.`);
+      setCountersData((prev) => ({
+        ...prev,
+        [venueKey]: (prev[venueKey] || []).map((c) => {
+          if (c.id !== counterId) return c;
           return {
             ...c,
             nowServing: null,
             skippedList: updatedSkippedList,
           };
-        }
-      }),
-    }));
+        }),
+      }));
+    }
   };
 
   // Mark Currently Serving as Completed / Served
-  const handleMarkServed = (counterId) => {
-    setCountersData((prev) => ({
-      ...prev,
-      [selectedVenue.id]: prev[selectedVenue.id].map((c) => {
-        if (c.id !== counterId) return c;
-        if (!c.nowServing) return c;
-        showToast(`Ticket ${c.nowServing.token} marked as Served`);
-        setServedTodayCount((cnt) => cnt + 1);
+  const handleMarkServed = async (counterId) => {
+    const venueKey = selectedVenue.id;
+    const currentCounters = countersData[venueKey] || [];
+    const targetCounter = currentCounters.find((c) => c.id === counterId);
 
-        if (c.queue.length > 0) {
-          const [nextGuest, ...remainingQueue] = c.queue;
-          const updatedRemaining = remainingQueue.map((item, idx) =>
-            idx === 0 ? { ...item, status: 'Next In Line' } : item
-          );
+    if (!targetCounter || !targetCounter.nowServing) return;
+
+    const currentServing = targetCounter.nowServing;
+
+    // Send backend API call if currentServing has MongoDB ID
+    if (currentServing.id && currentServing.id.length >= 12) {
+      try {
+        await api.patch(`/tickets/${currentServing.id}/status`, { status: 'served' });
+      } catch (err) {
+        console.warn('[AdminDashboard]: API markServed failed:', err.message);
+      }
+    }
+
+    showToast(`Ticket ${currentServing.token} marked as Served`);
+    setServedTodayCount((cnt) => cnt + 1);
+
+    if (targetCounter.queue.length > 0) {
+      const [nextGuest, ...remainingQueue] = targetCounter.queue;
+      if (nextGuest.id && nextGuest.id.length >= 12) {
+        try {
+          await api.patch(`/tickets/${nextGuest.id}/status`, { status: 'serving' });
+        } catch (err) {
+          console.warn('[AdminDashboard]: API callNext after served failed:', err.message);
+        }
+      }
+      const updatedRemaining = remainingQueue.map((item, idx) =>
+        idx === 0 ? { ...item, status: 'Next In Line' } : item
+      );
+      setCountersData((prev) => ({
+        ...prev,
+        [venueKey]: (prev[venueKey] || []).map((c) => {
+          if (c.id !== counterId) return c;
           return {
             ...c,
             nowServing: {
+              id: nextGuest.id,
               token: nextGuest.ticket,
               name: nextGuest.name,
               party: nextGuest.party,
@@ -355,10 +425,17 @@ export const AdminDashboard = () => {
             },
             queue: updatedRemaining,
           };
-        }
-        return { ...c, nowServing: null };
-      }),
-    }));
+        }),
+      }));
+    } else {
+      setCountersData((prev) => ({
+        ...prev,
+        [venueKey]: (prev[venueKey] || []).map((c) => {
+          if (c.id !== counterId) return c;
+          return { ...c, nowServing: null };
+        }),
+      }));
+    }
   };
 
   // 3. PRIMARY ACTION: Reset Queue (Confirm reset for shift end)
@@ -368,7 +445,7 @@ export const AdminDashboard = () => {
 
     setCountersData((prev) => ({
       ...prev,
-      [selectedVenue.id]: prev[selectedVenue.id].map((c) => {
+      [selectedVenue.id]: (prev[selectedVenue.id] || []).map((c) => {
         if (c.id !== counterId) return c;
         return {
           ...c,
@@ -384,7 +461,15 @@ export const AdminDashboard = () => {
   };
 
   // 4. USER ACTION ROW: Serve Now (Force out-of-order call)
-  const handleServeNowOutOfOrder = (counterId, queueItemId) => {
+  const handleServeNowOutOfOrder = async (counterId, queueItemId) => {
+    if (queueItemId && queueItemId.length >= 12) {
+      try {
+        await api.patch(`/tickets/${queueItemId}/status`, { status: 'serving' });
+      } catch (err) {
+        console.warn('[AdminDashboard]: API serveNowOutOfOrder failed:', err.message);
+      }
+    }
+
     setCountersData((prev) => ({
       ...prev,
       [selectedVenue.id]: prev[selectedVenue.id].map((c) => {
@@ -402,6 +487,7 @@ export const AdminDashboard = () => {
         return {
           ...c,
           nowServing: {
+            id: targetGuest.id,
             token: targetGuest.ticket,
             name: targetGuest.name,
             party: targetGuest.party,
@@ -414,7 +500,15 @@ export const AdminDashboard = () => {
   };
 
   // 5. USER ACTION ROW: Remove / Cancel
-  const handleRemoveFromQueue = (counterId, queueItemId) => {
+  const handleRemoveFromQueue = async (counterId, queueItemId) => {
+    if (queueItemId && queueItemId.length >= 12) {
+      try {
+        await api.delete(`/tickets/${queueItemId}/leave`);
+      } catch (err) {
+        console.warn('[AdminDashboard]: API remove queue item failed:', err.message);
+      }
+    }
+
     setCountersData((prev) => ({
       ...prev,
       [selectedVenue.id]: prev[selectedVenue.id].map((c) => {
@@ -456,30 +550,42 @@ export const AdminDashboard = () => {
   };
 
   // Handle Walk-In Ticket Issued from AddWalkInModal
-  const handleWalkInTicketIssued = (ticketData) => {
+  const handleWalkInTicketIssued = async (ticketData) => {
+    let createdTicket = null;
+    try {
+      const res = await api.post('/tickets/join', {
+        venueId: selectedVenue.mongoId || selectedVenue._id || selectedVenue.id,
+        counterId: ticketData.counterId,
+        partySize: ticketData.party,
+        guestName: ticketData.name,
+      });
+      if (res && res.ticket) {
+        createdTicket = res.ticket;
+      }
+    } catch (err) {
+      console.warn('[AdminDashboard]: API walk-in ticket join fallback:', err.message);
+    }
+
     setCountersData((prev) => ({
       ...prev,
-      [selectedVenue.id]: prev[selectedVenue.id].map((c) => {
+      [selectedVenue.id]: (prev[selectedVenue.id] || []).map((c) => {
         if (c.id !== ticketData.counterId) return c;
-        const isFirst = c.queue.length === 0 && !c.nowServing;
-
         const newGuest = {
-          id: `q-walk-${Date.now()}`,
-          ticket: ticketData.ticket,
-          name: ticketData.name,
-          party: Number(ticketData.party),
-          wait: '0m',
-          status: isFirst ? 'Next In Line' : c.queue.length === 0 ? 'Next In Line' : 'Waiting',
+          id: createdTicket?._id || `q-walk-${Date.now()}`,
+          ticket: createdTicket?.ticketNumber || ticketData.ticket,
+          name: createdTicket?.guestName || ticketData.name,
+          party: Number(createdTicket?.partySize || ticketData.party),
+          wait: `${createdTicket?.estimatedWaitMinutes || 8}m`,
+          status: c.queue.length === 0 ? 'Next In Line' : 'Waiting',
         };
-
-        showToast(`Issued Walk-In Ticket ${ticketData.ticket} for ${ticketData.name}`);
-
+        showToast(`Issued Walk-In Ticket ${newGuest.ticket} for ${newGuest.name}`);
         return {
           ...c,
           queue: [...c.queue, newGuest],
         };
       }),
     }));
+    return createdTicket;
   };
 
   // Handle QR Scanner Token Verification & Mark Served

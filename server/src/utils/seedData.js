@@ -1,6 +1,8 @@
 try {
   require('node:dns/promises').setServers(['1.1.1.1', '8.8.8.8']);
-} catch (e) {}
+} catch {
+  // Ignore DNS resolution error if unavailable
+}
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 const mongoose = require('mongoose');

@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: queueit-backend
+    env: node
+    region: singapore
+    buildCommand: npm install --prefix server
+    startCommand: node server/src/server.js
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: CLIENT_URL
+        sync: false

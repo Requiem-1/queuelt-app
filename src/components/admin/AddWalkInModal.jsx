@@ -28,12 +28,11 @@ export const AddWalkInModal = ({
 
   const activeCounterId = targetCounterId || availableCounters[0]?.id || '';
 
-  const handleIssueTicket = (e) => {
+  const handleIssueTicket = async (e) => {
     e.preventDefault();
     const selectedCounter = availableCounters.find((c) => c.id === activeCounterId) || availableCounters[0];
     if (!selectedCounter) return;
 
-    // Generate next sequential token number
     const code = selectedCounter.code || 'W';
     const queueLen = (selectedCounter.queue ? selectedCounter.queue.length : 0) + 1;
     const randomNum = Math.floor(100 + Math.random() * 900);
@@ -51,10 +50,17 @@ export const AddWalkInModal = ({
     };
 
     if (onAddWalkIn) {
-      onAddWalkIn(newTicketData);
+      const created = await onAddWalkIn(newTicketData);
+      if (created) {
+        setIssuedTicket({
+          ...newTicketData,
+          ticket: created.ticketNumber || generatedToken,
+          estWait: `${created.estimatedWaitMinutes || 8} mins`,
+        });
+        return;
+      }
     }
 
-    // Switch view to Printable Receipt Badge
     setIssuedTicket(newTicketData);
   };
 
