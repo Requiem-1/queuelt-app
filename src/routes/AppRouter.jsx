@@ -24,11 +24,8 @@ const PageLoader = () => (
 );
 
 const RootRoute = () => {
-  const { user, isLoading } = useAuth();
+  const { isLoading } = useAuth();
   if (isLoading) return <PageLoader />;
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
   return (
     <PageTransition>
       <HomePage />
@@ -40,8 +37,8 @@ export const AppRouter = () => {
   const location = useLocation();
 
   return (
-    <AnimatePresence mode="wait">
-      <Suspense fallback={<PageLoader />}>
+    <Suspense fallback={<PageLoader />}>
+      <AnimatePresence mode="wait" initial={false}>
         <Routes location={location} key={location.pathname}>
           <Route path="/" element={<MainLayout />}>
             {/* Public / Protected Routes */}
@@ -126,8 +123,8 @@ export const AppRouter = () => {
             <Route path="*" element={<PageTransition><NotFoundPage /></PageTransition>} />
           </Route>
         </Routes>
-      </Suspense>
-    </AnimatePresence>
+      </AnimatePresence>
+    </Suspense>
   );
 };
 

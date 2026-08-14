@@ -22,12 +22,20 @@ const getOrCreateGuestId = () => {
 };
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(
-    typeof window !== 'undefined' && window.sessionStorage
-      ? sessionStorage.getItem(TOKEN_KEY) || null
-      : null
-  );
+  const [user, setUser] = useState(() => {
+    if (typeof window === 'undefined') return null;
+    const raw = sessionStorage.getItem(USER_KEY) || localStorage.getItem(USER_KEY);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  });
+  const [token, setToken] = useState(() => {
+    if (typeof window === 'undefined') return null;
+    return sessionStorage.getItem(TOKEN_KEY) || localStorage.getItem(TOKEN_KEY) || null;
+  });
   const [isLoading, setIsLoading] = useState(true);
 
   const setGuestFallback = useCallback(() => {
@@ -40,54 +48,45 @@ export const AuthProvider = ({ children }) => {
     };
     setUser(guestUser);
     setToken(null);
-    if (typeof window !== 'undefined' && window.sessionStorage) {
+    if (typeof window !== 'undefined') {
       sessionStorage.setItem(USER_KEY, JSON.stringify(guestUser));
+      localStorage.setItem(USER_KEY, JSON.stringify(guestUser));
     }
   }, []);
 
   // Hydrate user session on mount
   useEffect(() => {
     const hydrateUser = async () => {
-      // Clear any legacy persistent login session stored in localStorage across server restarts
-      if (typeof window !== 'undefined' && window.localStorage) {
-        localStorage.removeItem(TOKEN_KEY);
-        localStorage.removeItem(USER_KEY);
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        localStorage.removeItem('queueit_active_ticket');
+      const storedToken = sessionStorage.getItem(TOKEN_KEY) || localStorage.getItem(TOKEN_KEY);
+      const storedUserRaw = sessionStorage.getItem(USER_KEY) || localStorage.getItem(USER_KEY);
+
+      let localUser = null;
+      if (storedUserRaw) {
+        try {
+          localUser = JSON.parse(storedUserRaw);
+        } catch {
+          localUser = null;
+        }
       }
 
-      const storedToken = sessionStorage.getItem(TOKEN_KEY);
+      if (localUser) {
+        setUser(localUser);
+      }
+
       if (storedToken) {
+        setToken(storedToken);
         try {
           const res = await api.get('/auth/me');
           if (res && res.user) {
             setUser(res.user);
-            setToken(storedToken);
             sessionStorage.setItem(USER_KEY, JSON.stringify(res.user));
-          } else {
-            throw new Error('Invalid user payload');
+            localStorage.setItem(USER_KEY, JSON.stringify(res.user));
           }
         } catch (error) {
-          console.warn('[AuthContext]: Failed to hydrate user via /auth/me:', error.message);
-          const storedUser = sessionStorage.getItem(USER_KEY);
-          if (storedUser) {
-            try {
-              setUser(JSON.parse(storedUser));
-            } catch {
-              setUser(null);
-              setToken(null);
-            }
-          } else {
-            setUser(null);
-            setToken(null);
-          }
+          console.warn('[AuthContext]: Failed to hydrate user via /auth/me, keeping cached session:', error.message);
         }
-      } else {
-        // Clear session state if no sessionStorage token exists
-        setUser(null);
-        setToken(null);
       }
+
       setIsLoading(false);
     };
 
@@ -106,6 +105,8 @@ export const AuthProvider = ({ children }) => {
         setUser(data.user);
         sessionStorage.setItem(TOKEN_KEY, data.token);
         sessionStorage.setItem(USER_KEY, JSON.stringify(data.user));
+        localStorage.setItem(TOKEN_KEY, data.token);
+        localStorage.setItem(USER_KEY, JSON.stringify(data.user));
         return data.user;
       }
       throw new Error(data?.message || 'Login failed');
@@ -148,6 +149,8 @@ export const AuthProvider = ({ children }) => {
         setUser(fallbackUser);
         sessionStorage.setItem(TOKEN_KEY, mockToken);
         sessionStorage.setItem(USER_KEY, JSON.stringify(fallbackUser));
+        localStorage.setItem(TOKEN_KEY, mockToken);
+        localStorage.setItem(USER_KEY, JSON.stringify(fallbackUser));
         return fallbackUser;
       }
 
@@ -169,6 +172,8 @@ export const AuthProvider = ({ children }) => {
         setUser(data.user);
         sessionStorage.setItem(TOKEN_KEY, data.token);
         sessionStorage.setItem(USER_KEY, JSON.stringify(data.user));
+        localStorage.setItem(TOKEN_KEY, data.token);
+        localStorage.setItem(USER_KEY, JSON.stringify(data.user));
         return data.user;
       }
       throw new Error(data?.message || 'Registration failed');
@@ -186,6 +191,8 @@ export const AuthProvider = ({ children }) => {
       setUser(mockUser);
       sessionStorage.setItem(TOKEN_KEY, mockToken);
       sessionStorage.setItem(USER_KEY, JSON.stringify(mockUser));
+      localStorage.setItem(TOKEN_KEY, mockToken);
+      localStorage.setItem(USER_KEY, JSON.stringify(mockUser));
       return mockUser;
     } finally {
       setIsLoading(false);
@@ -204,6 +211,8 @@ export const AuthProvider = ({ children }) => {
         setUser(data.user);
         sessionStorage.setItem(TOKEN_KEY, data.token);
         sessionStorage.setItem(USER_KEY, JSON.stringify(data.user));
+        localStorage.setItem(TOKEN_KEY, data.token);
+        localStorage.setItem(USER_KEY, JSON.stringify(data.user));
         return data.user;
       }
     } catch (error) {
@@ -220,6 +229,8 @@ export const AuthProvider = ({ children }) => {
       setUser(guestUser);
       sessionStorage.setItem(TOKEN_KEY, mockToken);
       sessionStorage.setItem(USER_KEY, JSON.stringify(guestUser));
+      localStorage.setItem(TOKEN_KEY, mockToken);
+      localStorage.setItem(USER_KEY, JSON.stringify(guestUser));
       return guestUser;
     } finally {
       setIsLoading(false);
@@ -264,8 +275,9 @@ export const AuthProvider = ({ children }) => {
     if (!user) return;
     const updatedUser = { ...user, role };
     setUser(updatedUser);
-    if (typeof window !== 'undefined' && window.sessionStorage) {
+    if (typeof window !== 'undefined') {
       sessionStorage.setItem(USER_KEY, JSON.stringify(updatedUser));
+      localStorage.setItem(USER_KEY, JSON.stringify(updatedUser));
     }
   };
 
