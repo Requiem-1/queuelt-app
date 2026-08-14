@@ -11,8 +11,21 @@ export const QRScannerModal = ({ isOpen = false, onClose = () => {} }) => {
   if (!isOpen) return null;
 
   const handleLookup = (searchQuery = tokenInput) => {
-    const query = searchQuery.trim().toUpperCase();
+    let query = searchQuery.trim().toUpperCase();
     if (!query) return;
+
+    // Extract ticket code if a full status URL or encoded parameter was scanned
+    if (query.includes('/STATUS/')) {
+      const match = query.match(/\/STATUS\/([^?#/]+)/i);
+      if (match && match[1]) {
+        query = decodeURIComponent(match[1]).toUpperCase();
+      }
+    } else if (query.includes('TICKET=')) {
+      const match = query.match(/TICKET=([^&]+)/i);
+      if (match && match[1]) {
+        query = decodeURIComponent(match[1]).toUpperCase();
+      }
+    }
 
     let foundToken = null;
     let foundCounterName = '';

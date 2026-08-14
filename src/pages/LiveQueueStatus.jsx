@@ -34,64 +34,32 @@ import {
 
 import socket from '../services/socket';
 import api from '../services/api';
+import { QRCodeSVG } from 'qrcode.react';
 
-// Mock QR Code Component
-const QRCodeDisplay = ({ tokenId, hash }) => (
-  <div className="p-5 bg-white rounded-2xl border-2 border-black inline-block shadow-lg max-w-[240px] mx-auto space-y-2">
-    <svg className="w-44 h-44 mx-auto" viewBox="0 0 100 100">
-      {/* Background */}
-      <rect width="100" height="100" fill="#FFFFFF" />
+// Real Scannable QR Code Component
+const QRCodeDisplay = ({ tokenId, hash }) => {
+  const targetUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/queue/status/${encodeURIComponent(tokenId || 'TICKET')}?hash=${encodeURIComponent(hash || '')}`
+    : `https://queueit.app/verify/${tokenId || 'TICKET'}`;
 
-      {/* Outer Corners */}
-      <rect x="5" y="5" width="25" height="25" fill="#000000" />
-      <rect x="9" y="9" width="17" height="17" fill="#FFFFFF" />
-      <rect x="13" y="13" width="9" height="9" fill="#000000" />
-
-      <rect x="70" y="5" width="25" height="25" fill="#000000" />
-      <rect x="74" y="9" width="17" height="17" fill="#FFFFFF" />
-      <rect x="78" y="13" width="9" height="9" fill="#000000" />
-
-      <rect x="5" y="70" width="25" height="25" fill="#000000" />
-      <rect x="9" y="74" width="17" height="17" fill="#FFFFFF" />
-      <rect x="13" y="78" width="9" height="9" fill="#000000" />
-
-      {/* Pattern Matrix */}
-      <rect x="35" y="10" width="6" height="6" fill="#000000" />
-      <rect x="45" y="10" width="6" height="6" fill="#000000" />
-      <rect x="55" y="10" width="6" height="6" fill="#000000" />
-
-      <rect x="10" y="35" width="6" height="6" fill="#000000" />
-      <rect x="20" y="35" width="6" height="6" fill="#000000" />
-      <rect x="35" y="35" width="6" height="6" fill="#000000" />
-      <rect x="45" y="35" width="6" height="6" fill="#000000" />
-      <rect x="55" y="35" width="6" height="6" fill="#000000" />
-      <rect x="70" y="35" width="6" height="6" fill="#000000" />
-      <rect x="85" y="35" width="6" height="6" fill="#000000" />
-
-      <rect x="35" y="45" width="6" height="6" fill="#000000" />
-      <rect x="55" y="45" width="6" height="6" fill="#000000" />
-      <rect x="75" y="45" width="6" height="6" fill="#000000" />
-
-      <rect x="15" y="55" width="6" height="6" fill="#000000" />
-      <rect x="35" y="55" width="6" height="6" fill="#000000" />
-      <rect x="45" y="55" width="6" height="6" fill="#000000" />
-      <rect x="65" y="55" width="6" height="6" fill="#000000" />
-      <rect x="85" y="55" width="6" height="6" fill="#000000" />
-
-      <rect x="35" y="70" width="6" height="6" fill="#000000" />
-      <rect x="55" y="70" width="6" height="6" fill="#000000" />
-      <rect x="65" y="70" width="6" height="6" fill="#000000" />
-      <rect x="75" y="70" width="6" height="6" fill="#000000" />
-
-      <rect x="45" y="85" width="6" height="6" fill="#000000" />
-      <rect x="65" y="85" width="6" height="6" fill="#000000" />
-      <rect x="85" y="85" width="6" height="6" fill="#000000" />
-    </svg>
-    <p className="text-[10px] font-mono text-center font-bold text-black tracking-wider border-t border-zinc-200 pt-1.5">
-      {tokenId} &bull; {hash}
-    </p>
-  </div>
-);
+  return (
+    <div className="p-4 sm:p-5 bg-white rounded-2xl border border-zinc-200 inline-block shadow-lg max-w-[260px] mx-auto space-y-2.5">
+      <div className="flex items-center justify-center p-1 bg-white rounded-xl">
+        <QRCodeSVG
+          value={targetUrl}
+          size={180}
+          bgColor="#FFFFFF"
+          fgColor="#000000"
+          level="H"
+          marginSize={2}
+        />
+      </div>
+      <p className="text-[10px] font-mono text-center font-bold text-black tracking-wider border-t border-zinc-200 pt-2 truncate max-w-[220px] mx-auto">
+        {tokenId} &bull; {hash}
+      </p>
+    </div>
+  );
+};
 
 export const LiveQueueStatus = () => {
   const { id } = useParams();
