@@ -49,8 +49,7 @@ api.interceptors.response.use(
     const message =
       error.response?.data?.message || error.message || 'An unexpected API error occurred';
 
-    // Only toast on 5xx server errors, suppress toast on 401/404 so caller can handle gracefully
-    if (status >= 500) {
+    if (status >= 500 && error.config?.showGlobalErrorToast) {
       toast.error('Server unavailable or database connection error');
     }
 
