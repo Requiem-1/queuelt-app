@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
 import { Menu } from 'lucide-react';
 import Navbar from './Navbar';
 import Footer from './Footer';

@@ -1,7 +1,5 @@
-const mongoose = require('mongoose');
-const Venue = require('../models/Venue');
-const Counter = require('../models/Counter');
-const Ticket = require('../models/Ticket');
+const venueService = require('../services/venueService');
+const { error } = require('../utils/apiResponse');
 
 /**
  * @desc    Get all venues
@@ -10,38 +8,15 @@ const Ticket = require('../models/Ticket');
  */
 const getVenues = async (req, res) => {
   try {
-    const venues = await Venue.find().sort({ createdAt: -1 });
-
-    // Fetch counter counts, names & waiting ticket stats for each venue
-    const enrichedVenues = await Promise.all(
-      venues.map(async (venue) => {
-        const venueCounters = await Counter.find({ venue: venue._id }).select('name');
-        const waitingTicketsCount = await Ticket.countDocuments({
-          venue: venue._id,
-          status: { $in: ['waiting', 'next'] },
-        });
-
-        return {
-          ...venue.toObject(),
-          totalCounters: venueCounters.length,
-          counters: venueCounters.map((c) => c.name),
-          activeQueueCount: waitingTicketsCount,
-        };
-      })
-    );
-
-    res.json({
+    const venues = await venueService.getAllVenues();
+    return res.json({
       success: true,
-      count: enrichedVenues.length,
-      venues: enrichedVenues,
+      count: venues.length,
+      venues,
     });
-  } catch (error) {
-    console.error('[venueController]: getVenues error:', error.message);
-    res.status(500).json({
-      success: false,
-      message: 'Server error fetching venues',
-      error: error.message,
-    });
+  } catch (err) {
+    console.error('[venueController]: getVenues error:', err.message);
+    return error(res, err.message, err.statusCode || 500);
   }
 };
 
@@ -52,63 +27,14 @@ const getVenues = async (req, res) => {
  */
 const getVenueBySlug = async (req, res) => {
   try {
-    const { slug } = req.params;
-
-    let venue;
-    if (mongoose.Types.ObjectId.isValid(slug)) {
-      venue = await Venue.findOne({ $or: [{ slug: slug.toLowerCase() }, { _id: slug }] });
-    } else {
-      venue = await Venue.findOne({ slug: slug.toLowerCase() });
-    }
-
-    if (!venue) {
-      return res.status(404).json({
-        success: false,
-        message: `Venue with slug or ID '${slug}' not found`,
-      });
-    }
-
-    // Fetch counters for this venue
-    const counters = await Counter.find({ venue: venue._id }).sort({ name: 1 });
-
-    // Populate live queue metrics for each counter
-    const countersWithStats = await Promise.all(
-      counters.map(async (counter) => {
-        const waitingCount = await Ticket.countDocuments({
-          counter: counter._id,
-          status: { $in: ['waiting', 'next'] },
-        });
-
-        const currentServingTicket = await Ticket.findOne({
-          counter: counter._id,
-          status: 'serving',
-        }).select('ticketNumber guestName calledAt');
-
-        return {
-          ...counter.toObject(),
-          waitingCount,
-          currentServingTicket: currentServingTicket || null,
-        };
-      })
-    );
-
-    const totalWaiting = countersWithStats.reduce((sum, c) => sum + c.waitingCount, 0);
-
-    res.json({
+    const venue = await venueService.getVenueBySlug(req.params.slug);
+    return res.json({
       success: true,
-      venue: {
-        ...venue.toObject(),
-        totalWaitingTickets: totalWaiting,
-        counters: countersWithStats,
-      },
+      venue,
     });
-  } catch (error) {
-    console.error('[venueController]: getVenueBySlug error:', error.message);
-    res.status(500).json({
-      success: false,
-      message: 'Server error fetching venue details',
-      error: error.message,
-    });
+  } catch (err) {
+    console.error('[venueController]: getVenueBySlug error:', err.message);
+    return error(res, err.message, err.statusCode || 500);
   }
 };
 
